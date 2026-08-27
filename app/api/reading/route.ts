@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 export const runtime = "nodejs";
 
 const REQUEST_TIMEOUT_MS = 12_000;
-const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
 type GeminiResponse = {
   candidates?: Array<{
@@ -42,20 +42,28 @@ export async function POST(request: NextRequest) {
   const model = process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.85, maxOutputTokens: 1_000 },
-        }),
-        signal: controller.signal,
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
-    );
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.85, maxOutputTokens: 1_000 },
+      }),
+      signal: controller.signal,
+    });
 
     if (!response.ok) {
+      const responseBody = await response.text();
+      console.error("Gemini API returned an error", {
+        status: response.status,
+        statusText: response.statusText,
+        responseBody,
+        model,
+      });
       throw new Error("Gemini request failed");
     }
 
@@ -70,7 +78,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ text });
-  } catch {
+  } catch (error) {
+    console.error("Gemini reading request failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      model,
+    });
+
     return NextResponse.json(
       { error: "Màn sương đang quá dày. Xin hãy thử lại sau ít phút." },
       { status: 502 },

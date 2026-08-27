@@ -25,7 +25,7 @@ Mở `.env.local` và thêm khóa Gemini của bạn:
 ```env
 GEMINI_API_KEY=your_api_key_here
 # Tùy chọn: đổi model nếu project Gemini của bạn chỉ cho phép model khác
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 ## Chạy local

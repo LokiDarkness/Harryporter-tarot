@@ -2,79 +2,75 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const LIMIT = 12_000;
-
 export async function POST(req: NextRequest) {
   try {
     const key = process.env.GEMINI_API_KEY;
 
     if (!key) {
       return NextResponse.json(
-        {
-          error: "Thiếu GEMINI_API_KEY"
-        },
-        {
-          status: 503
-        }
+        { error: "Thiếu GEMINI_API_KEY" },
+        { status: 500 }
       );
     }
 
-    const body = await req.json() as {
-      prompt?: string;
-    };
+    const body = await req.json();
 
-    if (!body.prompt || body.prompt.length > 800) {
+    if (!body.prompt || typeof body.prompt !== "string") {
       return NextResponse.json(
-        {
-          error: "Lời thỉnh cầu chưa hợp lệ."
-        },
-        {
-          status: 400
-        }
+        { error: "Câu hỏi không hợp lệ." },
+        { status: 400 }
       );
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
+          "x-goog-api-key": key,
         },
+
         body: JSON.stringify({
           contents: [
             {
+              role: "user",
               parts: [
                 {
-                  text: body.prompt
-                }
-              ]
-            }
-          ]
-        })
+                  text: body.prompt,
+                },
+              ],
+            },
+          ],
+        }),
       }
     );
 
     const data = await response.json();
 
     console.log("Gemini status:", response.status);
-    console.log("Gemini response:", JSON.stringify(data));
+    console.log(
+      "Gemini FULL response:",
+      JSON.stringify(data, null, 2)
+    );
 
     if (!response.ok) {
       return NextResponse.json(
         {
-          error: "Gemini API lỗi",
-          details: data
+          error:
+            data?.error?.message ||
+            "Gemini API không thể xử lý yêu cầu.",
         },
         {
-          status: response.status
+          status: response.status,
         }
       );
     }
 
     const text =
       data?.candidates?.[0]?.content?.parts
-        ?.map((p: { text?: string }) => p.text || "")
+        ?.map((part: { text?: string }) => part.text || "")
         .join("")
         .trim();
 
@@ -82,28 +78,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: "Gemini không trả về nội dung.",
-          details: data
         },
         {
-          status: 502
+          status: 502,
         }
       );
     }
 
     return NextResponse.json({
-      text
+      text,
     });
 
   } catch (error) {
-    console.error("API ERROR:", error);
+
+    console.error("SERVER ERROR:", error);
 
     return NextResponse.json(
       {
-        error: "Màn sương đang quá dày.",
-        details: error instanceof Error ? error.message : String(error)
+        error:
+          error instanceof Error
+            ? error.message
+            : "Lỗi máy chủ",
       },
       {
-        status: 502
+        status: 500,
       }
     );
   }
